@@ -13,7 +13,7 @@
         <div>
           <a href="{{ url_for('phishing_detector_bp.analyze_emails') }}" id="analyze-button" class="btn btn-primary">
             <i class="bi bi-shield-check"></i> Analyze All Emails
-          </a>
+          </button>
         </div>
         <div>
           <div class="alert alert-info mb-0 d-inline-flex align-items-center" role="alert">
@@ -173,43 +173,32 @@
         showPhishingDetails(emailId);
       }
     });
+    
+    // Setup analyze button
   });
   
-  // We now use a direct link for the analyze button instead of AJAX
+  // We're now using a direct link for the analyze button
   
   function loadPhishingStats() {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    
-    fetch('{{ url_for("phishing_detector_bp.phishing_stats") }}', {
-      method: 'GET',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.error) {
-        console.error('Error loading phishing stats:', data.error);
-        return;
-      }
-      
-      // Update stats
-      document.getElementById('analyzed-count').textContent = data.analyzed_emails;
-      document.getElementById('phishing-count').textContent = data.phishing_emails;
-      document.getElementById('percent-phishing').textContent = data.percentage_phishing + '%';
-      
-      // Update recent phishing emails
-      updatePhishingTable(data.recent_phishing);
-    })
-    .catch(error => {
-      console.error('Error fetching phishing stats:', error);
-      // Don't update UI on error
-    });
+    fetch('{{ url_for("phishing_detector_bp.phishing_stats") }}')
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          console.error('Error loading phishing stats:', data.error);
+          return;
+        }
+        
+        // Update stats
+        document.getElementById('analyzed-count').textContent = data.analyzed_emails;
+        document.getElementById('phishing-count').textContent = data.phishing_emails;
+        document.getElementById('percent-phishing').textContent = data.percentage_phishing + '%';
+        
+        // Update recent phishing emails
+        updatePhishingTable(data.recent_phishing);
+      })
+      .catch(error => {
+        console.error('Error fetching phishing stats:', error);
+      });
   }
   
   function updatePhishingTable(phishingEmails) {
@@ -220,7 +209,7 @@
     // Clear existing rows
     tableBody.innerHTML = '';
     
-    if (!phishingEmails || phishingEmails.length === 0) {
+    if (phishingEmails.length === 0) {
       tableContainer.classList.add('d-none');
       noPhishingMessage.classList.remove('d-none');
       return;
@@ -257,75 +246,66 @@
   
   function showPhishingDetails(emailId) {
     // Fetch phishing details for the email
-    fetch(`{{ url_for("phishing_detector_bp.phishing_details", email_id=0) }}`.replace('0', emailId), {
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.error) {
-        console.error('Error loading phishing details:', data.error);
-        return;
-      }
-      
-      // Update modal content
-      document.getElementById('modal-email-subject').textContent = document.querySelector(`button[data-email-id="${emailId}"]`)
-        .closest('tr').querySelector('td:nth-child(2)').textContent;
-      document.getElementById('modal-email-sender').textContent = 'From: ' + document.querySelector(`button[data-email-id="${emailId}"]`)
-        .closest('tr').querySelector('td:nth-child(1)').textContent;
-      document.getElementById('modal-phishing-score').textContent = data.phishing_score + '%';
-      
-      // Update phishing indicators
-      const indicatorsList = document.getElementById('phishing-indicators');
-      indicatorsList.innerHTML = '';
-      
-      if (data.explanations && data.explanations.length > 0) {
-        data.explanations.forEach(explanation => {
+    fetch(`{{ url_for("phishing_detector_bp.phishing_details", email_id=0) }}`.replace('0', emailId))
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          console.error('Error loading phishing details:', data.error);
+          return;
+        }
+        
+        // Update modal content
+        document.getElementById('modal-email-subject').textContent = document.querySelector(`button[data-email-id="${emailId}"]`)
+          .closest('tr').querySelector('td:nth-child(2)').textContent;
+        document.getElementById('modal-email-sender').textContent = 'From: ' + document.querySelector(`button[data-email-id="${emailId}"]`)
+          .closest('tr').querySelector('td:nth-child(1)').textContent;
+        document.getElementById('modal-phishing-score').textContent = data.phishing_score + '%';
+        
+        // Update phishing indicators
+        const indicatorsList = document.getElementById('phishing-indicators');
+        indicatorsList.innerHTML = '';
+        
+        if (data.explanations && data.explanations.length > 0) {
+          data.explanations.forEach(explanation => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.innerHTML = `<i class="bi bi-exclamation-circle text-danger me-2"></i> ${explanation}`;
+            indicatorsList.appendChild(li);
+          });
+        } else {
           const li = document.createElement('li');
           li.className = 'list-group-item';
-          li.innerHTML = `<i class="bi bi-exclamation-circle text-danger me-2"></i> ${explanation}`;
+          li.textContent = 'No specific indicators available';
           indicatorsList.appendChild(li);
-        });
-      } else {
-        const li = document.createElement('li');
-        li.className = 'list-group-item';
-        li.textContent = 'No specific indicators available';
-        indicatorsList.appendChild(li);
-      }
-      
-      // Set the email ID for the feedback buttons
-      document.getElementById('mark-legitimate').setAttribute('data-email-id', emailId);
-      document.getElementById('mark-phishing').setAttribute('data-email-id', emailId);
-      
-      // Clear any previous feedback status
-      document.getElementById('feedback-status').innerHTML = '';
-      
-      // Update feedback status if the user has already provided feedback
-      if (data.user_feedback !== null) {
-        const feedbackType = data.user_feedback ? 'phishing' : 'legitimate';
-        const feedbackIcon = data.user_feedback ? 'exclamation-triangle' : 'check-circle';
-        const feedbackClass = data.user_feedback ? 'warning' : 'success';
+        }
         
-        document.getElementById('feedback-status').innerHTML = `
-          <div class="alert alert-${feedbackClass} mb-0">
-            <i class="bi bi-${feedbackIcon}"></i> You marked this as ${feedbackType}
-          </div>
-        `;
-      }
-      
-      // Show the modal
-      const modal = new bootstrap.Modal(document.getElementById('phishingDetailsModal'));
-      modal.show();
-    })
-    .catch(error => {
-      console.error('Error fetching phishing details:', error);
-    });
+        // Set the email ID for the feedback buttons
+        document.getElementById('mark-legitimate').setAttribute('data-email-id', emailId);
+        document.getElementById('mark-phishing').setAttribute('data-email-id', emailId);
+        
+        // Clear any previous feedback status
+        document.getElementById('feedback-status').innerHTML = '';
+        
+        // Update feedback status if the user has already provided feedback
+        if (data.user_feedback !== null) {
+          const feedbackType = data.user_feedback ? 'phishing' : 'legitimate';
+          const feedbackIcon = data.user_feedback ? 'exclamation-triangle' : 'check-circle';
+          const feedbackClass = data.user_feedback ? 'warning' : 'success';
+          
+          document.getElementById('feedback-status').innerHTML = `
+            <div class="alert alert-${feedbackClass} mb-0">
+              <i class="bi bi-${feedbackIcon}"></i> You marked this as ${feedbackType}
+            </div>
+          `;
+        }
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('phishingDetailsModal'));
+        modal.show();
+      })
+      .catch(error => {
+        console.error('Error fetching phishing details:', error);
+      });
   }
   
   // Setup event listeners for feedback buttons
@@ -344,16 +324,10 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
       },
       body: JSON.stringify({ is_phishing: isPhishing })
     })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
       if (data.error) {
         console.error('Error submitting feedback:', data.error);
