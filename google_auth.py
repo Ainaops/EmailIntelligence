@@ -46,13 +46,16 @@ def login():
         authorization_endpoint = google_provider_cfg["authorization_endpoint"]
 
         # Use the library to construct the request for Google login
+        # Use the predefined redirect URL that matches what's in Google Cloud Console
+        redirect_uri = DEV_REDIRECT_URL
+        
         request_uri = client.prepare_request_uri(
             authorization_endpoint,
-            # Replacing http:// with https:// is important as the external
-            # protocol must be https to match the URI whitelisted
-            redirect_uri=request.base_url.replace("http://", "https://") + "/callback",
+            redirect_uri=redirect_uri,
             scope=["openid", "email", "profile", "https://mail.google.com/"],
         )
+        
+        logger.debug(f"Redirecting to: {request_uri}")
         return redirect(request_uri)
     except Exception as e:
         logger.error(f"Error during Google login: {str(e)}")
@@ -73,12 +76,17 @@ def callback():
         token_endpoint = google_provider_cfg["token_endpoint"]
 
         # Prepare and send token request
+        # Use the predefined redirect URL that matches what's in Google Cloud Console
+        redirect_uri = DEV_REDIRECT_URL
+        
+        # Log debugging information
+        logger.debug(f"Authorization code: {code}")
+        logger.debug(f"Redirect URI: {redirect_uri}")
+        
         token_url, headers, body = client.prepare_token_request(
             token_endpoint,
-            # Replacing http:// with https:// is important as the external
-            # protocol must be https to match the URI whitelisted
             authorization_response=request.url.replace("http://", "https://"),
-            redirect_url=request.base_url.replace("http://", "https://"),
+            redirect_url=redirect_uri,
             code=code,
         )
         token_response = requests.post(
