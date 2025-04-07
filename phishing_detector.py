@@ -77,7 +77,11 @@ def analyze_emails():
         
         if not emails:
             flash("No new emails to analyze", "info")
-            return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
+            return jsonify({
+                'success': True,
+                'message': 'No new emails to analyze',
+                'count': 0
+            })
         
         analyzed_count = 0
         for email in emails:
@@ -101,12 +105,23 @@ def analyze_emails():
         db.session.commit()
         flash(f"Successfully analyzed {analyzed_count} emails", "success")
         
+        # Return JSON response for AJAX calls
+        return jsonify({
+            'success': True,
+            'message': f'Successfully analyzed {analyzed_count} emails',
+            'count': analyzed_count
+        })
+        
     except Exception as e:
         logger.error(f"Error analyzing emails: {str(e)}")
         flash("Error analyzing emails", "danger")
         db.session.rollback()
-    
-    return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
+        
+        return jsonify({
+            'success': False,
+            'message': 'Error analyzing emails',
+            'error': str(e)
+        }), 500
 
 @phishing_detector_bp.route('/phishing_stats')
 @login_required

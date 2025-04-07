@@ -36,6 +36,9 @@ def profile():
         .order_by(Email.date_processed.desc())\
         .limit(5).all()
     
+    # Add current time for token expiry check
+    now = datetime.utcnow()
+    
     return render_template('profile.html', 
                           user=current_user,
                           progress=progress,
@@ -43,7 +46,8 @@ def profile():
                           read_emails=read_emails,
                           read_percentage=read_percentage,
                           favorite_senders=favorite_senders,
-                          recent_emails=recent_emails)
+                          recent_emails=recent_emails,
+                          now=now)
 
 @user_progress_bp.route("/update-username", methods=['POST'])
 @login_required

@@ -67,6 +67,9 @@
                                     <a href="{{ url_for('email_processor_bp.email_detail', email_id=email.id) }}" class="btn btn-sm btn-primary">
                                         <i class="fas fa-eye"></i> View
                                     </a>
+                                    <button class="btn btn-sm btn-outline-danger analyze-phishing-btn" data-email-id="{{ email.id }}">
+                                        <i class="fas fa-shield-alt"></i> Analyze
+                                    </button>
                                     {% if not email.is_read %}
                                         <button class="btn btn-sm btn-outline-success mark-read-btn" data-email-id="{{ email.id }}">
                                             <i class="fas fa-check"></i> Mark Read
@@ -150,6 +153,63 @@
         </div>
     </div>
 </div>
+
+<!-- Phishing Analysis Modal -->
+<div class="modal fade" id="phishingAnalysisModal" tabindex="-1" aria-labelledby="phishingAnalysisModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="phishingAnalysisModalLabel">Phishing Analysis</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="phishing-analysis-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Analyzing email for phishing indicators...</p>
+                </div>
+                
+                <div id="phishing-analysis-results" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h5 id="modal-email-subject">Email Subject</h5>
+                            <p class="text-muted" id="modal-email-sender">From: sender@example.com</p>
+                        </div>
+                        <div>
+                            <div class="alert d-flex align-items-center" role="alert" id="phishing-score-alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <div>
+                                    Phishing Score: <span id="modal-phishing-score">95%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h6>Phishing Indicators:</h6>
+                    <ul class="list-group mb-4" id="phishing-indicators">
+                        <!-- Indicators will be added here dynamically -->
+                    </ul>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Safety Tip:</strong> Never click on suspicious links or provide personal information in response to unexpected emails.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="me-auto" id="phishing-feedback-status"></div>
+                <button type="button" class="btn btn-danger" id="mark-as-phishing">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm as Phishing
+                </button>
+                <button type="button" class="btn btn-success" id="mark-as-legitimate">
+                    <i class="fas fa-check-circle"></i> Mark as Legitimate
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -181,6 +241,154 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => console.error('Error marking email as read:', error));
         });
     });
+
+    // Handle phishing analysis buttons
+    const analyzePhishingButtons = document.querySelectorAll('.analyze-phishing-btn');
+    analyzePhishingButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const emailId = this.getAttribute('data-email-id');
+            const row = this.closest('tr');
+            const subject = row.querySelector('td:nth-child(3)').textContent;
+            const sender = row.querySelector('td:nth-child(2)').textContent;
+            
+            // Reset modal content
+            document.getElementById('modal-email-subject').textContent = subject;
+            document.getElementById('modal-email-sender').textContent = 'From: ' + sender;
+            document.getElementById('phishing-indicators').innerHTML = '';
+            document.getElementById('phishing-feedback-status').innerHTML = '';
+            
+            // Set button data
+            document.getElementById('mark-as-phishing').setAttribute('data-email-id', emailId);
+            document.getElementById('mark-as-legitimate').setAttribute('data-email-id', emailId);
+            
+            // Show loading state
+            document.getElementById('phishing-analysis-loading').classList.remove('d-none');
+            document.getElementById('phishing-analysis-results').classList.add('d-none');
+            
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('phishingAnalysisModal'));
+            modal.show();
+            
+            // Fetch phishing analysis
+            fetch(`/email/${emailId}/phishing_details`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading phishing details:', data.error);
+                        return;
+                    }
+                    
+                    // Update phishing score
+                    document.getElementById('modal-phishing-score').textContent = data.phishing_score + '%';
+                    
+                    // Set appropriate alert color based on score
+                    const scoreAlert = document.getElementById('phishing-score-alert');
+                    if (data.phishing_score > 70) {
+                        scoreAlert.classList.add('alert-danger');
+                        scoreAlert.classList.remove('alert-warning', 'alert-success');
+                    } else if (data.phishing_score > 30) {
+                        scoreAlert.classList.add('alert-warning');
+                        scoreAlert.classList.remove('alert-danger', 'alert-success');
+                    } else {
+                        scoreAlert.classList.add('alert-success');
+                        scoreAlert.classList.remove('alert-danger', 'alert-warning');
+                    }
+                    
+                    // Update phishing indicators
+                    const indicatorsList = document.getElementById('phishing-indicators');
+                    indicatorsList.innerHTML = '';
+                    
+                    if (data.explanations && data.explanations.length > 0) {
+                        data.explanations.forEach(explanation => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item';
+                            li.innerHTML = `<i class="fas fa-exclamation-circle text-danger me-2"></i> ${explanation}`;
+                            indicatorsList.appendChild(li);
+                        });
+                    } else {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.textContent = 'No specific indicators available';
+                        indicatorsList.appendChild(li);
+                    }
+                    
+                    // Update feedback status if the user has already provided feedback
+                    if (data.user_feedback !== null) {
+                        const feedbackType = data.user_feedback ? 'phishing' : 'legitimate';
+                        const feedbackIcon = data.user_feedback ? 'exclamation-triangle' : 'check-circle';
+                        const feedbackClass = data.user_feedback ? 'warning' : 'success';
+                        
+                        document.getElementById('phishing-feedback-status').innerHTML = `
+                            <div class="alert alert-${feedbackClass} mb-0">
+                                <i class="fas fa-${feedbackIcon}"></i> You marked this as ${feedbackType}
+                            </div>
+                        `;
+                    }
+                    
+                    // Hide loading, show results
+                    document.getElementById('phishing-analysis-loading').classList.add('d-none');
+                    document.getElementById('phishing-analysis-results').classList.remove('d-none');
+                })
+                .catch(error => {
+                    console.error('Error fetching phishing details:', error);
+                    document.getElementById('phishing-indicators').innerHTML = `
+                        <li class="list-group-item text-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i> Error analyzing email. Please try again.
+                        </li>
+                    `;
+                    document.getElementById('phishing-analysis-loading').classList.add('d-none');
+                    document.getElementById('phishing-analysis-results').classList.remove('d-none');
+                });
+        });
+    });
+    
+    // Handle feedback buttons
+    document.getElementById('mark-as-legitimate').addEventListener('click', function() {
+        const emailId = this.getAttribute('data-email-id');
+        submitPhishingFeedback(emailId, false);
+    });
+    
+    document.getElementById('mark-as-phishing').addEventListener('click', function() {
+        const emailId = this.getAttribute('data-email-id');
+        submitPhishingFeedback(emailId, true);
+    });
+    
+    function submitPhishingFeedback(emailId, isPhishing) {
+        fetch(`/email/${emailId}/submit_feedback`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_phishing: isPhishing })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error submitting feedback:', data.error);
+                document.getElementById('phishing-feedback-status').innerHTML = `
+                    <div class="alert alert-danger mb-0">
+                        <i class="fas fa-exclamation-circle"></i> Error: ${data.error}
+                    </div>
+                `;
+                return;
+            }
+            
+            // Show success message
+            document.getElementById('phishing-feedback-status').innerHTML = `
+                <div class="alert alert-success mb-0">
+                    <i class="fas fa-check-circle"></i> ${data.message}
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('phishing-feedback-status').innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="fas fa-exclamation-circle"></i> Error submitting feedback
+                </div>
+            `;
+        });
+    }
 
     // Handle search functionality
     const searchInput = document.getElementById('emailSearch');
