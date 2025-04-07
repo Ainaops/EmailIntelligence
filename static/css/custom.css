@@ -1,0 +1,95 @@
+/* Custom styles for Email Processor */
+
+/* Email body display */
+.email-body {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
+/* Card hover effect */
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Custom progress bar */
+.progress {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    height: 0.75rem;
+}
+
+.progress-bar {
+    background-color: var(--bs-primary);
+    border-radius: 0.5rem;
+}
+
+/* Dashboard icons */
+.dashboard-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--bs-primary);
+}
+
+/* Email list table */
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Custom list group for dashboard */
+.list-group-item.bg-dark {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Button spacing */
+.btn {
+    margin-right: 0.25rem;
+}
+
+/* Chart containers */
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+/* Email detail tabs */
+#emailContentTabs .nav-link.active {
+    background-color: var(--bs-primary);
+    color: white;
+    border-color: var(--bs-primary);
+}
+
+/* Pagination active style */
+.page-item.active .page-link {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+/* Alert customization */
+.alert {
+    border-radius: 0.5rem;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .dashboard-stats {
+        text-align: center;
+    }
+    
+    .btn-responsive {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}

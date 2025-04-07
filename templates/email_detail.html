@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block title %} - Email Detail{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <a href="{{ url_for('email_processor_bp.emails_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Emails
+        </a>
+    </div>
+</div>
+
+<div class="card bg-dark mb-4">
+    <div class="card-header">
+        <h2 class="mb-0">{{ email.subject }}</h2>
+    </div>
+    <div class="card-body">
+        <div class="email-metadata mb-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>From:</strong> {{ email.sender_name or '' }} &lt;{{ email.sender }}&gt;</p>
+                    <p><strong>To:</strong> {{ email.recipient }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p><strong>Date:</strong> {{ email.date_received.strftime("%Y-%m-%d %H:%M") if email.date_received else "Unknown" }}</p>
+                    <p><strong>Status:</strong> 
+                        {% if email.is_read %}
+                            <span class="badge bg-success">Read</span>
+                        {% else %}
+                            <span class="badge bg-warning">Unread</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <hr>
+        </div>
+
+        <ul class="nav nav-tabs mb-3" id="emailContentTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="cleaned-tab" data-bs-toggle="tab" data-bs-target="#cleaned" type="button" role="tab" aria-controls="cleaned" aria-selected="true">Cleaned Content</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="original-tab" data-bs-toggle="tab" data-bs-target="#original" type="button" role="tab" aria-controls="original" aria-selected="false">Original HTML</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="plain-tab" data-bs-toggle="tab" data-bs-target="#plain" type="button" role="tab" aria-controls="plain" aria-selected="false">Plain Text</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="emailContentTabsContent">
+            <div class="tab-pane fade show active" id="cleaned" role="tabpanel" aria-labelledby="cleaned-tab">
+                <div class="email-content p-3 bg-dark">
+                    <pre class="email-body">{{ email.body_cleaned }}</pre>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="original" role="tabpanel" aria-labelledby="original-tab">
+                <div class="email-content p-3 bg-dark">
+                    {% if email.body_html %}
+                        <iframe id="htmlContent" srcdoc="{{ email.body_html|e }}" style="width: 100%; height: 500px; border: 1px solid #ccc;"></iframe>
+                    {% else %}
+                        <div class="alert alert-info">No HTML content available</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="tab-pane fade" id="plain" role="tabpanel" aria-labelledby="plain-tab">
+                <div class="email-content p-3 bg-dark">
+                    {% if email.body_text %}
+                        <pre class="email-body">{{ email.body_text }}</pre>
+                    {% else %}
+                        <div class="alert alert-info">No plain text content available</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer">
+        <div class="d-flex justify-content-between">
+            <div>
+                {% if not email.is_read %}
+                    <button class="btn btn-success mark-read-btn" data-email-id="{{ email.id }}">
+                        <i class="fas fa-check"></i> Mark as Read
+                    </button>
+                {% endif %}
+            </div>
+            <div>
+                <a href="{{ url_for('email_processor_bp.emails_list') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-list"></i> All Emails
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle mark as read
+    const markReadBtn = document.querySelector('.mark-read-btn');
+    if (markReadBtn) {
+        markReadBtn.addEventListener('click', function() {
+            const emailId = this.getAttribute('data-email-id');
+            
+            fetch('/mark-read/' + emailId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the status badge
+                    const statusBadge = document.querySelector('.badge');
+                    statusBadge.textContent = 'Read';
+                    statusBadge.classList.remove('bg-warning');
+                    statusBadge.classList.add('bg-success');
+                    
+                    // Remove the mark as read button
+                    this.remove();
+                }
+            })
+            .catch(error => console.error('Error marking email as read:', error));
+        });
+    }
+    
+    // Adjust iframe height based on content
+    const iframe = document.getElementById('htmlContent');
+    if (iframe) {
+        iframe.onload = function() {
+            try {
+                const height = iframe.contentWindow.document.body.scrollHeight;
+                iframe.style.height = (height + 50) + 'px';
+            } catch (e) {
+                console.error('Could not adjust iframe height:', e);
+            }
+        };
+    }
+});
+</script>
+{% endblock %}

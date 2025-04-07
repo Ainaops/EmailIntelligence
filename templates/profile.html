@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %} - User Profile{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="mb-4">User Profile</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- User Information Card -->
+    <div class="col-md-6 mb-4">
+        <div class="card bg-dark">
+            <div class="card-header">
+                <h4 class="mb-0">Account Information</h4>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('user_progress_bp.update_username') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" value="{{ user.email }}" readonly>
+                        <div class="form-text">Your email address cannot be changed as it is linked to your Google account.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Account Created</label>
+                        <input type="text" class="form-control" value="{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Last Login</label>
+                        <input type="text" class="form-control" value="{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Unknown' }}" readonly>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Progress Card -->
+    <div class="col-md-6 mb-4">
+        <div class="card bg-dark mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">User Progress</h4>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Total Emails Processed:</span>
+                    <span class="badge bg-primary">{{ progress.total_emails_processed }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Total Emails:</span>
+                    <span class="badge bg-info">{{ total_emails }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Emails Read:</span>
+                    <span class="badge bg-success">{{ read_emails }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Read Percentage:</span>
+                    <span class="badge bg-warning">{{ read_percentage|round|int }}%</span>
+                </div>
+                <div class="progress mt-3 mb-4">
+                    <div class="progress-bar" role="progressbar" style="width: {{ read_percentage }}%" aria-valuenow="{{ read_percentage }}" aria-valuemin="0" aria-valuemax="100">{{ read_percentage|round|int }}%</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Last Email Processed</label>
+                    <input type="text" class="form-control" value="{{ progress.last_email_processed.strftime('%Y-%m-%d %H:%M') if progress.last_email_processed else 'Never' }}" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Last Synchronization</label>
+                    <input type="text" class="form-control" value="{{ progress.last_sync_date.strftime('%Y-%m-%d %H:%M') if progress.last_sync_date else 'Never' }}" readonly>
+                </div>
+                
+                <form action="{{ url_for('user_progress_bp.reset_progress') }}" method="POST" onsubmit="return confirm('Are you sure you want to reset your progress? This will delete all your processed emails.');">
+                    <button type="submit" class="btn btn-danger">Reset Progress</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Google Authentication Card -->
+        <div class="card bg-dark">
+            <div class="card-header">
+                <h4 class="mb-0">Google Authentication</h4>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Google Token Status</label>
+                    {% if user.gmail_token_expiry and user.gmail_token_expiry > now %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> Token active until {{ user.gmail_token_expiry.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-circle"></i> Token expired or not available
+                        </div>
+                    {% endif %}
+                </div>
+                <a href="{{ url_for('google_auth.refresh_token') }}" class="btn btn-primary">Refresh Google Token</a>
+                <a href="{{ url_for('google_auth.login') }}" class="btn btn-outline-primary">Re-authenticate</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Recent Activity Card -->
+    <div class="col-12">
+        <div class="card bg-dark">
+            <div class="card-header">
+                <h4 class="mb-0">Recent Activity</h4>
+            </div>
+            <div class="card-body">
+                {% if recent_emails %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Action</th>
+                                    <th>Subject</th>
+                                    <th>From</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for email in recent_emails %}
+                                    <tr>
+                                        <td>Processed Email</td>
+                                        <td class="text-truncate" style="max-width: 200px;">
+                                            <a href="{{ url_for('email_processor_bp.email_detail', email_id=email.id) }}">
+                                                {{ email.subject }}
+                                            </a>
+                                        </td>
+                                        <td>{{ email.sender_name or email.sender }}</td>
+                                        <td>{{ email.date_processed.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No recent activity</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
