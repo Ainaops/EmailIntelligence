@@ -12,9 +12,18 @@ from oauthlib.oauth2 import WebApplicationClient
 
 logger = logging.getLogger(__name__)
 
+# Get OAuth credentials from environment variables
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
 GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+
+# Log credential status at startup (without revealing the actual values)
+if not GOOGLE_CLIENT_ID:
+    logger.warning("GOOGLE_OAUTH_CLIENT_ID is not set")
+if not GOOGLE_CLIENT_SECRET:
+    logger.warning("GOOGLE_OAUTH_CLIENT_SECRET is not set")
+else:
+    logger.info("Google OAuth credentials are configured")
 
 # Make sure to use this redirect URL. It has to match the one in the whitelist
 DEV_REDIRECT_URL = f'https://{os.environ.get("REPLIT_DEV_DOMAIN", "localhost")}/google_login/callback'
@@ -102,17 +111,26 @@ def callback():
             flash("Authentication failed: OAuth credentials not configured", "danger")
             return redirect(url_for("index"))
             
+        # Create a tuple for auth only if both values are present
+        auth = None
+        if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+            auth = (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+        else:
+            raise ValueError("Google OAuth credentials missing or invalid")
+            
         token_response = requests.post(
             token_url,
             headers=headers,
             data=body,
-            auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
+            auth=auth,
         )
         
         # Log response information
         logger.debug(f"Token response status: {token_response.status_code}")
         if token_response.status_code != 200:
-            logger.error(f"Token response error: {token_response.text}")
+            error_msg = f"Token response error: {token_response.text}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         # Parse the token response
         token_data = token_response.json()
@@ -197,6 +215,12 @@ def refresh_token():
     try:
         token_endpoint = requests.get(GOOGLE_DISCOVERY_URL).json()["token_endpoint"]
         
+        # Verify that we have valid credentials
+        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            logger.error("Missing Google OAuth credentials for token refresh")
+            flash("OAuth credentials not configured properly", "danger")
+            return redirect(url_for("google_auth.login"))
+            
         refresh_data = {
             "client_id": GOOGLE_CLIENT_ID,
             "client_secret": GOOGLE_CLIENT_SECRET,
@@ -204,7 +228,11 @@ def refresh_token():
             "grant_type": "refresh_token"
         }
         
+        logger.debug("Attempting to refresh access token")
         token_response = requests.post(token_endpoint, data=refresh_data)
+        
+        # Log response status for debugging
+        logger.debug(f"Token refresh response status: {token_response.status_code}")
         token_data = token_response.json()
         
         if "access_token" in token_data:
