@@ -77,11 +77,15 @@ def analyze_emails():
         
         if not emails:
             flash("No new emails to analyze", "info")
-            return jsonify({
-                'success': True,
-                'message': 'No new emails to analyze',
-                'count': 0
-            })
+            # Check if this is a direct browser request
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'success': True,
+                    'message': 'No new emails to analyze',
+                    'count': 0
+                })
+            else:
+                return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
         
         analyzed_count = 0
         for email in emails:
@@ -105,23 +109,31 @@ def analyze_emails():
         db.session.commit()
         flash(f"Successfully analyzed {analyzed_count} emails", "success")
         
-        # Return JSON response for AJAX calls
-        return jsonify({
-            'success': True,
-            'message': f'Successfully analyzed {analyzed_count} emails',
-            'count': analyzed_count
-        })
+        # Check if this is a direct browser request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # Return JSON response for AJAX calls
+            return jsonify({
+                'success': True,
+                'message': f'Successfully analyzed {analyzed_count} emails',
+                'count': analyzed_count
+            })
+        else:
+            # Redirect for browser requests
+            return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
         
     except Exception as e:
         logger.error(f"Error analyzing emails: {str(e)}")
         flash("Error analyzing emails", "danger")
         db.session.rollback()
         
-        return jsonify({
-            'success': False,
-            'message': 'Error analyzing emails',
-            'error': str(e)
-        }), 500
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': False,
+                'message': 'Error analyzing emails',
+                'error': str(e)
+            }), 500
+        else:
+            return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
 
 @phishing_detector_bp.route('/phishing_stats')
 @login_required
@@ -200,33 +212,47 @@ def phishing_details(email_id):
             )
             db.session.add(classification)
             db.session.commit()
+            
+            flash(f"Email analyzed. Phishing score: {round(phishing_score * 100, 1)}%", "success")
+            return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
         
-        # Parse features
-        features = json.loads(classification.features_json)
-        
-        # Get explanations for phishing indicators
-        explanations = []
-        if features.get('has_urgent_subject'):
-            explanations.append("Contains urgent or alarming language in the subject")
-        if features.get('has_suspicious_links'):
-            explanations.append("Contains links that might lead to malicious websites")
-        if features.get('has_request_for_info'):
-            explanations.append("Asks for sensitive information like passwords or account details")
-        if not features.get('sender_domain_match'):
-            explanations.append("Sender email domain doesn't match the sender's claimed identity")
-        
-        return jsonify({
-            'email_id': email.id,
-            'phishing_score': round(classification.phishing_score * 100, 1),
-            'is_phishing': classification.is_phishing,
-            'classified_at': classification.classified_at.strftime('%Y-%m-%d %H:%M'),
-            'explanations': explanations,
-            'user_feedback': classification.feedback
-        })
+        # Check if this is an AJAX request or a direct browser request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # For AJAX requests, return JSON
+            # Parse features
+            features = json.loads(classification.features_json)
+            
+            # Get explanations for phishing indicators
+            explanations = []
+            if features.get('has_urgent_subject'):
+                explanations.append("Contains urgent or alarming language in the subject")
+            if features.get('has_suspicious_links'):
+                explanations.append("Contains links that might lead to malicious websites")
+            if features.get('has_request_for_info'):
+                explanations.append("Asks for sensitive information like passwords or account details")
+            if not features.get('sender_domain_match'):
+                explanations.append("Sender email domain doesn't match the sender's claimed identity")
+            
+            return jsonify({
+                'email_id': email.id,
+                'phishing_score': round(classification.phishing_score * 100, 1),
+                'is_phishing': classification.is_phishing,
+                'classified_at': classification.classified_at.strftime('%Y-%m-%d %H:%M'),
+                'explanations': explanations,
+                'user_feedback': classification.feedback
+            })
+        else:
+            # For direct browser requests, redirect to phishing dashboard
+            flash(f"Email analyzed. Phishing score: {round(classification.phishing_score * 100, 1)}%", "success")
+            return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
         
     except Exception as e:
         logger.error(f"Error getting phishing details: {str(e)}")
-        return jsonify({'error': 'Could not retrieve phishing details'}), 500
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Could not retrieve phishing details'}), 500
+        else:
+            flash("Error analyzing email", "danger")
+            return redirect(url_for('email_processor_bp.emails_list'))
 
 @phishing_detector_bp.route('/email/<int:email_id>/submit_feedback', methods=['POST'])
 @login_required

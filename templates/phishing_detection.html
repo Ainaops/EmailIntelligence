@@ -11,8 +11,8 @@
       
       <div class="d-flex justify-content-between align-items-center">
         <div>
-          <button id="analyze-button" class="btn btn-primary">
-            <i class="bi bi-shield-check"></i> Analyze Emails
+          <a href="{{ url_for('phishing_detector_bp.analyze_emails') }}" id="analyze-button" class="btn btn-primary">
+            <i class="bi bi-shield-check"></i> Analyze All Emails
           </button>
         </div>
         <div>
@@ -175,43 +175,9 @@
     });
     
     // Setup analyze button
-    document.getElementById('analyze-button').addEventListener('click', function() {
-      analyzeEmails();
-    });
   });
   
-  function analyzeEmails() {
-    // Show loading state
-    const statusMessage = document.getElementById('status-message');
-    const analyzeButton = document.getElementById('analyze-button');
-    
-    statusMessage.textContent = 'Analyzing emails...';
-    analyzeButton.disabled = true;
-    analyzeButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Analyzing...';
-    
-    // Call the analyze endpoint
-    fetch('{{ url_for("phishing_detector_bp.analyze_emails") }}')
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          statusMessage.textContent = data.message;
-          // Refresh stats
-          loadPhishingStats();
-        } else {
-          statusMessage.textContent = data.message || 'Error analyzing emails';
-          console.error('Error analyzing emails:', data.error);
-        }
-      })
-      .catch(error => {
-        console.error('Error analyzing emails:', error);
-        statusMessage.textContent = 'Error analyzing emails';
-      })
-      .finally(() => {
-        // Reset button state
-        analyzeButton.disabled = false;
-        analyzeButton.innerHTML = '<i class="bi bi-shield-check"></i> Analyze Emails';
-      });
-  }
+  // We're now using a direct link for the analyze button
   
   function loadPhishingStats() {
     fetch('{{ url_for("phishing_detector_bp.phishing_stats") }}')
