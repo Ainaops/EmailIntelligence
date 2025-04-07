@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
             modal.show();
             
             // Fetch phishing analysis
-            fetch(`/email/${emailId}/phishing_details`)
+            fetch(`{{ url_for('phishing_detector_bp.phishing_details', email_id=0) }}`.replace('0', emailId))
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -354,7 +354,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     function submitPhishingFeedback(emailId, isPhishing) {
-        fetch(`/email/${emailId}/submit_feedback`, {
+        fetch(`{{ url_for("phishing_detector_bp.submit_phishing_feedback", email_id=0) }}`.replace("0", emailId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
