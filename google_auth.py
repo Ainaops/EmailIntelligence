@@ -82,6 +82,8 @@ def callback():
         # Log debugging information
         logger.debug(f"Authorization code: {code}")
         logger.debug(f"Redirect URI: {redirect_uri}")
+        logger.debug(f"Client ID is set: {bool(GOOGLE_CLIENT_ID)}")
+        logger.debug(f"Client Secret is set: {bool(GOOGLE_CLIENT_SECRET)}")
         
         token_url, headers, body = client.prepare_token_request(
             token_endpoint,
@@ -89,12 +91,28 @@ def callback():
             redirect_url=redirect_uri,
             code=code,
         )
+        
+        # Log request details
+        logger.debug(f"Token URL: {token_url}")
+        logger.debug(f"Request body: {body}")
+        
+        # Make sure client credentials are not None
+        if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+            logger.error("Google OAuth credentials missing")
+            flash("Authentication failed: OAuth credentials not configured", "danger")
+            return redirect(url_for("index"))
+            
         token_response = requests.post(
             token_url,
             headers=headers,
             data=body,
             auth=(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET),
         )
+        
+        # Log response information
+        logger.debug(f"Token response status: {token_response.status_code}")
+        if token_response.status_code != 200:
+            logger.error(f"Token response error: {token_response.text}")
 
         # Parse the token response
         token_data = token_response.json()
