@@ -70,11 +70,6 @@
                                     <a href="{{ url_for('phishing_detector_bp.phishing_details', email_id=email.id) }}" class="btn btn-sm btn-outline-danger analyze-phishing-btn" data-email-id="{{ email.id }}">
                                         <i class="fas fa-shield-alt"></i> Analyze
                                     </a>
-                                    {% if email.phishing_classification %}
-                                    <a href="{{ url_for('phishing_detector_bp.reanalyze_email', email_id=email.id) }}" class="btn btn-sm btn-outline-warning reanalyze-btn" data-email-id="{{ email.id }}">
-                                        <i class="fas fa-sync-alt"></i> Reanalyze
-                                    </a>
-                                    {% endif %}
                                     {% if not email.is_read %}
                                         <button class="btn btn-sm btn-outline-success mark-read-btn" data-email-id="{{ email.id }}">
                                             <i class="fas fa-check"></i> Mark Read

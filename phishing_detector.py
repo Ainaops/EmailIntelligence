@@ -279,5 +279,3 @@ def submit_phishing_feedback(email_id):
     except Exception as e:
         logger.error(f"Error submitting phishing feedback: {str(e)}")
         return jsonify({'error': 'Could not submit feedback'}), 500
-
-
