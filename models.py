@@ -2,6 +2,12 @@ from datetime import datetime
 from app import db
 from flask_login import UserMixin
 
+# Define machine learning model type enum
+class MLModelType:
+    ENSEMBLE = 'ensemble'
+    NEURAL_NETWORK = 'neural_network'
+    RULE_BASED = 'rule_based'
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -49,3 +55,20 @@ class UserProgress(db.Model):
     
     def __repr__(self):
         return f'<UserProgress for user_id {self.user_id}>'
+
+class PhishingClassification(db.Model):
+    """Model to store phishing detection results for emails"""
+    id = db.Column(db.Integer, primary_key=True)
+    email_id = db.Column(db.Integer, db.ForeignKey('email.id'), nullable=False, unique=True)
+    phishing_score = db.Column(db.Float, nullable=False)  # Probability score (0-1)
+    is_phishing = db.Column(db.Boolean, default=False)
+    model_type = db.Column(db.String(32), default=MLModelType.ENSEMBLE)
+    features_json = db.Column(db.Text)  # Store features as JSON
+    feedback = db.Column(db.Boolean, nullable=True)  # User feedback (True=phishing, False=not phishing, None=no feedback)
+    classified_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    email = db.relationship('Email', backref=db.backref('phishing_classification', uselist=False))
+    
+    def __repr__(self):
+        return f'<PhishingClassification for email_id {self.email_id} score {self.phishing_score}>'

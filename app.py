@@ -42,7 +42,7 @@ def load_user(user_id):
 
 # Create database tables
 with app.app_context():
-    from models import User, Email, UserProgress
+    from models import User, Email, UserProgress, PhishingClassification
     db.create_all()
 
 # Import and register blueprints
@@ -50,11 +50,13 @@ from google_auth import google_auth
 from email_processor import email_processor_bp
 from user_progress import user_progress_bp
 from csv_exporter import csv_exporter_bp
+from phishing_detector import phishing_detector_bp
 
 app.register_blueprint(google_auth)
 app.register_blueprint(email_processor_bp)
 app.register_blueprint(user_progress_bp)
 app.register_blueprint(csv_exporter_bp)
+app.register_blueprint(phishing_detector_bp)
 
 # Route for the home page
 @app.route("/")
