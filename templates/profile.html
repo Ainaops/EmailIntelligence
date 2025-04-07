@@ -2,152 +2,566 @@
 
 {% block title %} - User Profile{% endblock %}
 
+{% block extra_css %}
+<style>
+    .profile-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin: 0 auto 1rem;
+        border: 4px solid var(--bs-info);
+    }
+    
+    .stat-card {
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .favorite-badge {
+        font-size: 0.8em;
+        padding: 0.5em;
+        margin-right: 0.5em;
+        margin-bottom: 0.5em;
+        display: inline-block;
+        white-space: nowrap;
+    }
+    
+    .nav-pills .nav-link.active {
+        background-color: var(--bs-info);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
-    <div class="col">
-        <h1 class="mb-4">User Profile</h1>
+    <div class="col-md-8">
+        <h1 class="mb-3">
+            <i class="fas fa-user-circle"></i> 
+            User Profile
+        </h1>
+        <p class="lead text-muted">Manage your account settings and view your activity</p>
     </div>
-</div>
-
-<div class="row">
-    <!-- User Information Card -->
-    <div class="col-md-6 mb-4">
-        <div class="card bg-dark">
-            <div class="card-header">
-                <h4 class="mb-0">Account Information</h4>
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('user_progress_bp.update_username') }}" method="POST">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email Address</label>
-                        <input type="email" class="form-control" id="email" value="{{ user.email }}" readonly>
-                        <div class="form-text">Your email address cannot be changed as it is linked to your Google account.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Account Created</label>
-                        <input type="text" class="form-control" value="{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Last Login</label>
-                        <input type="text" class="form-control" value="{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Unknown' }}" readonly>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Update Profile</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- User Progress Card -->
-    <div class="col-md-6 mb-4">
-        <div class="card bg-dark mb-4">
-            <div class="card-header">
-                <h4 class="mb-0">User Progress</h4>
-            </div>
-            <div class="card-body">
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Total Emails Processed:</span>
-                    <span class="badge bg-primary">{{ progress.total_emails_processed }}</span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Total Emails:</span>
-                    <span class="badge bg-info">{{ total_emails }}</span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Emails Read:</span>
-                    <span class="badge bg-success">{{ read_emails }}</span>
-                </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Read Percentage:</span>
-                    <span class="badge bg-warning">{{ read_percentage|round|int }}%</span>
-                </div>
-                <div class="progress mt-3 mb-4">
-                    <div class="progress-bar" role="progressbar" style="width: {{ read_percentage }}%" aria-valuenow="{{ read_percentage }}" aria-valuemin="0" aria-valuemax="100">{{ read_percentage|round|int }}%</div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Last Email Processed</label>
-                    <input type="text" class="form-control" value="{{ progress.last_email_processed.strftime('%Y-%m-%d %H:%M') if progress.last_email_processed else 'Never' }}" readonly>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Last Synchronization</label>
-                    <input type="text" class="form-control" value="{{ progress.last_sync_date.strftime('%Y-%m-%d %H:%M') if progress.last_sync_date else 'Never' }}" readonly>
-                </div>
-                
-                <form action="{{ url_for('user_progress_bp.reset_progress') }}" method="POST" onsubmit="return confirm('Are you sure you want to reset your progress? This will delete all your processed emails.');">
-                    <button type="submit" class="btn btn-danger">Reset Progress</button>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Google Authentication Card -->
-        <div class="card bg-dark">
-            <div class="card-header">
-                <h4 class="mb-0">Google Authentication</h4>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Google Token Status</label>
-                    {% if user.gmail_token_expiry and user.gmail_token_expiry > now %}
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle"></i> Token active until {{ user.gmail_token_expiry.strftime('%Y-%m-%d %H:%M') }}
-                        </div>
-                    {% else %}
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-circle"></i> Token expired or not available
-                        </div>
-                    {% endif %}
-                </div>
-                <a href="{{ url_for('google_auth.refresh_token') }}" class="btn btn-primary">Refresh Google Token</a>
-                <a href="{{ url_for('google_auth.login') }}" class="btn btn-outline-primary">Re-authenticate</a>
-            </div>
-        </div>
+    <div class="col-md-4 text-end d-flex align-items-center justify-content-end">
+        <a href="{{ url_for('email_processor_bp.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
     </div>
 </div>
 
 <div class="row mb-4">
-    <!-- Recent Activity Card -->
+    <!-- Tabbed Profile Interface -->
     <div class="col-12">
         <div class="card bg-dark">
-            <div class="card-header">
-                <h4 class="mb-0">Recent Activity</h4>
-            </div>
             <div class="card-body">
-                {% if recent_emails %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Action</th>
-                                    <th>Subject</th>
-                                    <th>From</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for email in recent_emails %}
-                                    <tr>
-                                        <td>Processed Email</td>
-                                        <td class="text-truncate" style="max-width: 200px;">
-                                            <a href="{{ url_for('email_processor_bp.email_detail', email_id=email.id) }}">
-                                                {{ email.subject }}
-                                            </a>
-                                        </td>
-                                        <td>{{ email.sender_name or email.sender }}</td>
-                                        <td>{{ email.date_processed.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <!-- Profile Header Section -->
+                <div class="row align-items-center mb-4">
+                    <div class="col-md-3 text-center">
+                        <div class="profile-image-container">
+                            <img src="https://ui-avatars.com/api/?name={{ user.username|urlencode }}&size=150&background=0D8ABC&color=fff" alt="Profile" class="profile-image">
+                        </div>
                     </div>
-                {% else %}
-                    <p class="text-muted">No recent activity</p>
-                {% endif %}
+                    <div class="col-md-9">
+                        <h2 class="mb-2">{{ user.username }}</h2>
+                        <p class="text-muted">{{ user.email }}</p>
+                        
+                        <div class="d-flex flex-wrap mt-3">
+                            <div class="me-4 mb-2">
+                                <i class="fas fa-calendar-alt text-info"></i> Joined: 
+                                <span class="badge bg-info">{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}</span>
+                            </div>
+                            <div class="me-4 mb-2">
+                                <i class="fas fa-envelope text-info"></i> Emails: 
+                                <span class="badge bg-info">{{ total_emails }}</span>
+                            </div>
+                            <div class="me-4 mb-2">
+                                <i class="fas fa-eye text-info"></i> Read: 
+                                <span class="badge bg-success">{{ read_percentage|round|int }}%</span>
+                            </div>
+                            <div class="mb-2">
+                                <i class="fas fa-clock text-info"></i> Last Active: 
+                                <span class="badge bg-info">{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Unknown' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabs Navigation -->
+                <ul class="nav nav-pills mb-4" id="profileTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="account-tab" data-bs-toggle="tab" data-bs-target="#account" type="button" role="tab" aria-controls="account" aria-selected="true">
+                            <i class="fas fa-user-cog"></i> Account Settings
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="statistics-tab" data-bs-toggle="tab" data-bs-target="#statistics" type="button" role="tab" aria-controls="statistics" aria-selected="false">
+                            <i class="fas fa-chart-pie"></i> Email Statistics
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button" role="tab" aria-controls="activity" aria-selected="false">
+                            <i class="fas fa-history"></i> Recent Activity
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab" aria-controls="security" aria-selected="false">
+                            <i class="fas fa-lock"></i> Security & Connections
+                        </button>
+                    </li>
+                </ul>
+                
+                <!-- Tabs Content -->
+                <div class="tab-content" id="profileTabsContent">
+                    <!-- Account Settings Tab -->
+                    <div class="tab-pane fade show active" id="account" role="tabpanel" aria-labelledby="account-tab">
+                        <div class="row">
+                            <div class="col-md-7">
+                                <h4 class="mb-3">Profile Information</h4>
+                                <form action="{{ url_for('user_progress_bp.update_username') }}" method="POST">
+                                    <div class="mb-3">
+                                        <label for="username" class="form-label">Display Name</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                            <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" placeholder="Choose a display name">
+                                        </div>
+                                        <div class="form-text">This name will be displayed throughout the application.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email Address</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                            <input type="email" class="form-control" id="email" value="{{ user.email }}" readonly>
+                                        </div>
+                                        <div class="form-text">Your email address is linked to your Google account and cannot be changed here.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Account Created</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-calendar-plus"></i></span>
+                                            <input type="text" class="form-control" value="{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Last Login</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-sign-in-alt"></i></span>
+                                            <input type="text" class="form-control" value="{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Unknown' }}" readonly>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> Save Changes
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="col-md-5">
+                                <h4 class="mb-3">Account Actions</h4>
+                                <div class="card bg-dark border-secondary mb-3">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Reset Progress</h5>
+                                        <p class="card-text">This will delete all your processed emails and reset your progress statistics. This action cannot be undone.</p>
+                                        <form action="{{ url_for('user_progress_bp.reset_progress') }}" method="POST" onsubmit="return confirm('Are you sure you want to reset your progress? This will delete all your processed emails and cannot be undone.');">
+                                            <button type="submit" class="btn btn-danger">
+                                                <i class="fas fa-trash-alt"></i> Reset All Data
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                
+                                <div class="card bg-dark border-secondary mb-3">
+                                    <div class="card-body">
+                                        <h5 class="card-title">Export Your Data</h5>
+                                        <p class="card-text">Download a copy of all your email data in various formats.</p>
+                                        <a href="{{ url_for('csv_exporter_bp.export_page') }}" class="btn btn-info">
+                                            <i class="fas fa-file-export"></i> Export Options
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Email Statistics Tab -->
+                    <div class="tab-pane fade" id="statistics" role="tabpanel" aria-labelledby="statistics-tab">
+                        <h4 class="mb-3">Email Analytics</h4>
+                        
+                        <div class="row">
+                            <!-- Email Stats Cards -->
+                            <div class="col-md-3 mb-4">
+                                <div class="card bg-dark border-primary stat-card">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4 text-primary">{{ total_emails }}</h1>
+                                        <p class="card-text text-muted">Total Emails</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-4">
+                                <div class="card bg-dark border-success stat-card">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4 text-success">{{ read_emails }}</h1>
+                                        <p class="card-text text-muted">Emails Read</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-4">
+                                <div class="card bg-dark border-warning stat-card">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4 text-warning">{{ total_emails - read_emails }}</h1>
+                                        <p class="card-text text-muted">Unread Emails</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-4">
+                                <div class="card bg-dark border-info stat-card">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4 text-info">{{ progress.total_emails_processed }}</h1>
+                                        <p class="card-text text-muted">Processed Emails</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <!-- Read Progress Chart -->
+                            <div class="col-md-6 mb-4">
+                                <div class="card bg-dark">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Email Reading Progress</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="readingProgressChart" height="250"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Favorite Senders -->
+                            <div class="col-md-6 mb-4">
+                                <div class="card bg-dark">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Top Senders</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if favorite_senders and favorite_senders.items()|list|length > 0 %}
+                                            <div class="mb-3">
+                                                {% for sender, count in favorite_senders.items() %}
+                                                    <span class="badge bg-info favorite-badge">
+                                                        {{ sender }} <span class="badge bg-light text-dark">{{ count }}</span>
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                            <canvas id="senderChart" height="185"></canvas>
+                                        {% else %}
+                                            <div class="text-center py-5">
+                                                <i class="fas fa-envelope fa-3x text-muted mb-3"></i>
+                                                <p>No sender statistics available yet.<br>Process more emails to see your top senders.</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Processing Timeline -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card bg-dark">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Email Processing Timeline</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <strong>Last Email Processed:</strong> 
+                                            <span class="text-info">{{ progress.last_email_processed.strftime('%Y-%m-%d %H:%M') if progress.last_email_processed else 'Never' }}</span>
+                                        </div>
+                                        <div class="mb-3">
+                                            <strong>Last Gmail Sync:</strong> 
+                                            <span class="text-info">{{ progress.last_sync_date.strftime('%Y-%m-%d %H:%M') if progress.last_sync_date else 'Never' }}</span>
+                                        </div>
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ read_percentage }}%" 
+                                                 aria-valuenow="{{ read_percentage }}" aria-valuemin="0" aria-valuemax="100">
+                                                {{ read_percentage|round|int }}% Read
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity Tab -->
+                    <div class="tab-pane fade" id="activity" role="tabpanel" aria-labelledby="activity-tab">
+                        <h4 class="mb-3">Recent Activity</h4>
+                        
+                        {% if recent_emails %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 12%">Date/Time</th>
+                                            <th style="width: 15%">Action</th>
+                                            <th style="width: 30%">Subject</th>
+                                            <th style="width: 25%">From</th>
+                                            <th style="width: 18%">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for email in recent_emails %}
+                                            <tr>
+                                                <td>{{ email.date_processed.strftime('%Y-%m-%d %H:%M') }}</td>
+                                                <td><span class="badge bg-info">Email Processed</span></td>
+                                                <td class="text-truncate" style="max-width: 200px;">
+                                                    <a href="{{ url_for('email_processor_bp.email_detail', email_id=email.id) }}">
+                                                        {{ email.subject or '(No subject)' }}
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <span class="d-inline-block text-truncate" style="max-width: 175px;" title="{{ email.sender }}">
+                                                        {% if email.sender_name %}
+                                                            {{ email.sender_name }}
+                                                        {% else %}
+                                                            {{ email.sender }}
+                                                        {% endif %}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {% if email.is_read %}
+                                                        <span class="badge bg-success">Read</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">Unread</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <a href="{{ url_for('email_processor_bp.emails_list') }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-list"></i> View All Emails
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="card bg-dark">
+                                <div class="card-body text-center py-5">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <h5>No Recent Activity</h5>
+                                    <p class="text-muted">When you process emails, your activity will appear here.</p>
+                                    <a href="{{ url_for('email_processor_bp.fetch_emails_route') }}" class="btn btn-primary mt-2">
+                                        <i class="fas fa-sync-alt"></i> Fetch New Emails
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Security & Connections Tab -->
+                    <div class="tab-pane fade" id="security" role="tabpanel" aria-labelledby="security-tab">
+                        <h4 class="mb-3">Security & Connected Accounts</h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <div class="card bg-dark">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">Google Authentication</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-4">
+                                            <div class="me-3">
+                                                <i class="fab fa-google fa-3x text-info"></i>
+                                            </div>
+                                            <div>
+                                                <h5 class="mb-1">Google Account</h5>
+                                                <p class="mb-0 text-muted">{{ user.email }}</p>
+                                            </div>
+                                            <div class="ms-auto">
+                                                {% if user.gmail_token_expiry and user.gmail_token_expiry > now %}
+                                                    <span class="badge bg-success">Connected</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">Disconnected</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-4">
+                                            <h6>Token Status:</h6>
+                                            {% if user.gmail_token_expiry and user.gmail_token_expiry > now %}
+                                                <div class="alert alert-success">
+                                                    <i class="fas fa-check-circle me-2"></i> 
+                                                    <strong>Active</strong> - Your Google token is valid until {{ user.gmail_token_expiry.strftime('%Y-%m-%d %H:%M') }}
+                                                </div>
+                                            {% else %}
+                                                <div class="alert alert-warning">
+                                                    <i class="fas fa-exclamation-circle me-2"></i> 
+                                                    <strong>Expired or Missing</strong> - You need to refresh your Google token to access your emails
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="d-flex gap-2">
+                                            <a href="{{ url_for('google_auth.refresh_token') }}" class="btn btn-primary">
+                                                <i class="fas fa-sync-alt"></i> Refresh Token
+                                            </a>
+                                            <a href="{{ url_for('google_auth.login') }}" class="btn btn-outline-primary">
+                                                <i class="fas fa-sign-in-alt"></i> Re-authenticate
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-4">
+                                <div class="card bg-dark">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">App Permissions</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-4">
+                                            <h6>Gmail Access:</h6>
+                                            <ul class="list-group">
+                                                <li class="list-group-item bg-dark d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <i class="fas fa-envelope text-info me-2"></i> Read emails
+                                                    </div>
+                                                    <span class="badge bg-success rounded-pill">Granted</span>
+                                                </li>
+                                                <li class="list-group-item bg-dark d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <i class="fas fa-user text-info me-2"></i> Access profile info
+                                                    </div>
+                                                    <span class="badge bg-success rounded-pill">Granted</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <strong>How to revoke access:</strong> 
+                                            <p class="mb-0 mt-1">If you wish to revoke this application's access to your Google account, visit <a href="https://myaccount.google.com/permissions" target="_blank" class="text-white">Google Account Permissions</a> and remove this app.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-dark">
+                            <div class="card-header">
+                                <h5 class="mb-0">Security Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>This application uses OAuth 2.0 to authenticate with Google. We never store your Google password.</p>
+                                <div class="alert alert-secondary">
+                                    <i class="fas fa-shield-alt me-2"></i>
+                                    <strong>Privacy Note:</strong> Emails processed by this application are stored locally in our database for analysis. You can reset all stored data using the "Reset Progress" option.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Reading Progress Chart
+    const readingCtx = document.getElementById('readingProgressChart');
+    if (readingCtx) {
+        new Chart(readingCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Read', 'Unread'],
+                datasets: [{
+                    data: [{{ read_emails }}, {{ total_emails - read_emails }}],
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.8)',  // green for read
+                        'rgba(255, 193, 7, 0.8)'   // yellow for unread
+                    ],
+                    borderColor: [
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(255, 193, 7, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Top Senders Chart
+    const senderCtx = document.getElementById('senderChart');
+    if (senderCtx) {
+        const senders = [];
+        const counts = [];
+        
+        {% for sender, count in favorite_senders.items() %}
+            senders.push("{{ sender }}");
+            counts.push({{ count }});
+        {% endfor %}
+        
+        if (senders.length > 0) {
+            new Chart(senderCtx, {
+                type: 'bar',
+                data: {
+                    labels: senders,
+                    datasets: [{
+                        label: 'Emails Count',
+                        data: counts,
+                        backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
 {% endblock %}
