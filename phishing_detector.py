@@ -54,11 +54,7 @@ def classify_email(email_features):
     # Cap at 0.95 for placeholder model
     return min(score, 0.95)
 
-@phishing_detector_bp.route('/phishing_detection')
-@login_required
-def phishing_detection_dashboard():
-    """Display the phishing detection dashboard"""
-    return render_template('phishing_detection.html')
+# Removed phishing_detection_dashboard route as it's now integrated into email detail page
 
 @phishing_detector_bp.route('/analyze_emails')
 @login_required
@@ -85,7 +81,7 @@ def analyze_emails():
                     'count': 0
                 })
             else:
-                return redirect(url_for('phishing_detector_bp.phishing_detection_dashboard'))
+                return redirect(url_for('email_processor_bp.emails_list'))
         
         analyzed_count = 0
         for email in emails:

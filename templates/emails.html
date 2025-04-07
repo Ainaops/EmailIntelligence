@@ -67,7 +67,7 @@
                                     <a href="{{ url_for('email_processor_bp.email_detail', email_id=email.id) }}" class="btn btn-sm btn-primary">
                                         <i class="fas fa-eye"></i> View
                                     </a>
-                                    <a href="{{ url_for('phishing_detector_bp.phishing_details', email_id=email.id) }}" class="btn btn-sm btn-outline-danger analyze-phishing-btn" data-email-id="{{ email.id }}">
+                                    <a href="{{ url_for('email_processor_bp.email_detail', email_id=email.id) }}#phishing" class="btn btn-sm btn-outline-danger analyze-phishing-btn" data-email-id="{{ email.id }}">
                                         <i class="fas fa-shield-alt"></i> Analyze
                                     </a>
                                     {% if not email.is_read %}

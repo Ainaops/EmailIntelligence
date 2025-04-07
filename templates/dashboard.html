@@ -64,11 +64,70 @@
         </div>
     </div>
 
-    <!-- Favorite Senders Card -->
+    <!-- Phishing Detection Card -->
     <div class="col-md-4">
         <div class="card bg-dark mb-4">
             <div class="card-body">
-                <h5 class="card-title">Top Senders</h5>
+                <h5 class="card-title">Phishing Detection</h5>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Analyzed Emails:</span>
+                    <span class="badge bg-primary" id="analyzed-count">Loading...</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Phishing Detected:</span>
+                    <span class="badge bg-danger" id="phishing-count">Loading...</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Phishing Rate:</span>
+                    <span class="badge bg-warning" id="phishing-rate">Loading...</span>
+                </div>
+                <div class="progress mt-3">
+                    <div class="progress-bar bg-danger" role="progressbar" style="width: 0%" id="phishing-progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+            </div>
+            <div class="card-footer text-center">
+                <button id="analyze-all-emails" class="btn btn-sm btn-outline-danger">
+                    <i class="fas fa-shield-alt"></i> Analyze All Emails
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Recent Emails Chart -->
+    <div class="col-md-8">
+        <div class="card bg-dark mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Email Timeline</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="emailTimelineChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phishing vs Safe Chart -->
+    <div class="col-md-4">
+        <div class="card bg-dark mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Phishing vs Safe Emails</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="phishingChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Top Senders Card -->
+    <div class="col-md-6">
+        <div class="card bg-dark mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Top Senders</h5>
+            </div>
+            <div class="card-body">
                 {% if favorite_senders %}
                     <ul class="list-group list-group-flush">
                         {% for sender, count in favorite_senders.items() %}
@@ -84,25 +143,38 @@
             </div>
         </div>
     </div>
-</div>
 
-<div class="row mb-4">
-    <!-- Email Timeline Chart -->
-    <div class="col-md-8">
+    <!-- Recent Phishing Emails Card -->
+    <div class="col-md-6">
         <div class="card bg-dark mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Email Timeline</h5>
-                <canvas id="emailTimelineChart" height="250"></canvas>
+            <div class="card-header">
+                <h5 class="card-title mb-0">Recent Phishing Attempts</h5>
             </div>
-        </div>
-    </div>
-
-    <!-- Read vs Unread Chart -->
-    <div class="col-md-4">
-        <div class="card bg-dark mb-4">
             <div class="card-body">
-                <h5 class="card-title">Read vs Unread</h5>
-                <canvas id="readUnreadChart" height="250"></canvas>
+                <div id="recent-phishing-container">
+                    <div class="text-center py-4" id="no-phishing-message">
+                        <i class="fas fa-shield-alt fs-2 text-success"></i>
+                        <p class="mt-3">No phishing emails detected in your inbox.</p>
+                    </div>
+                    
+                    <div id="phishing-table-container" class="d-none">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Sender</th>
+                                        <th>Subject</th>
+                                        <th>Score</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="phishing-emails-table">
+                                    <!-- Phishing emails will be added here dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -141,6 +213,48 @@
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Load phishing stats
+    loadPhishingStats();
+    
+    // Setup periodic refresh
+    setInterval(loadPhishingStats, 30000); // Refresh every 30 seconds
+    
+    // Setup analyze all emails button
+    document.getElementById('analyze-all-emails').addEventListener('click', function() {
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+        
+        fetch('{{ url_for("phishing_detector_bp.analyze_emails") }}', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Refresh stats
+                loadPhishingStats();
+                
+                // Show success message
+                const button = document.getElementById('analyze-all-emails');
+                button.innerHTML = '<i class="fas fa-check"></i> ' + data.message;
+                setTimeout(() => {
+                    button.innerHTML = '<i class="fas fa-shield-alt"></i> Analyze All Emails';
+                    button.disabled = false;
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            console.error('Error analyzing emails:', error);
+            const button = document.getElementById('analyze-all-emails');
+            button.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
+            setTimeout(() => {
+                button.innerHTML = '<i class="fas fa-shield-alt"></i> Analyze All Emails';
+                button.disabled = false;
+            }, 3000);
+        });
+    });
+    
     // Fetch the statistics data from the server
     fetch('{{ url_for("user_progress_bp.statistics") }}')
         .then(response => response.json())
@@ -173,33 +287,132 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
-
-            // Create Read vs Unread Chart
-            const readUnreadCtx = document.getElementById('readUnreadChart').getContext('2d');
-            new Chart(readUnreadCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Read', 'Unread'],
-                    datasets: [{
-                        data: [data.read_status.read, data.read_status.unread],
-                        backgroundColor: [
-                            'rgba(40, 167, 69, 0.7)',
-                            'rgba(255, 193, 7, 0.7)'
-                        ],
-                        borderColor: [
-                            'rgba(40, 167, 69, 1)',
-                            'rgba(255, 193, 7, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
         })
         .catch(error => console.error('Error fetching statistics:', error));
 });
+
+function loadPhishingStats() {
+    fetch('{{ url_for("phishing_detector_bp.phishing_stats") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error loading phishing stats:', data.error);
+                return;
+            }
+            
+            // Update stats on the dashboard
+            document.getElementById('analyzed-count').textContent = data.analyzed_emails;
+            document.getElementById('phishing-count').textContent = data.phishing_emails;
+            document.getElementById('phishing-rate').textContent = data.percentage_phishing + '%';
+            
+            // Update progress bar
+            const progressBar = document.getElementById('phishing-progress');
+            progressBar.style.width = data.percentage_phishing + '%';
+            progressBar.setAttribute('aria-valuenow', data.percentage_phishing);
+            progressBar.textContent = data.percentage_phishing + '%';
+            
+            // Create/update Phishing vs Safe chart
+            createOrUpdatePhishingChart(data.analyzed_emails - data.phishing_emails, data.phishing_emails);
+            
+            // Update recent phishing table
+            updateRecentPhishingTable(data.recent_phishing);
+        })
+        .catch(error => {
+            console.error('Error fetching phishing stats:', error);
+        });
+}
+
+function createOrUpdatePhishingChart(safeCount, phishingCount) {
+    const ctx = document.getElementById('phishingChart').getContext('2d');
+    
+    // Check if chart already exists
+    if (window.phishingChart) {
+        // Update existing chart
+        window.phishingChart.data.datasets[0].data = [safeCount, phishingCount];
+        window.phishingChart.update();
+    } else {
+        // Create new chart
+        window.phishingChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Safe', 'Phishing'],
+                datasets: [{
+                    data: [safeCount, phishingCount],
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.7)',  // Green for safe
+                        'rgba(220, 53, 69, 0.7)'   // Red for phishing
+                    ],
+                    borderColor: [
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(220, 53, 69, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateRecentPhishingTable(phishingEmails) {
+    const tableContainer = document.getElementById('phishing-table-container');
+    const noPhishingMessage = document.getElementById('no-phishing-message');
+    const tableBody = document.getElementById('phishing-emails-table');
+    
+    // Clear existing rows
+    tableBody.innerHTML = '';
+    
+    if (!phishingEmails || phishingEmails.length === 0) {
+        tableContainer.classList.add('d-none');
+        noPhishingMessage.classList.remove('d-none');
+        return;
+    }
+    
+    // Show table and hide message
+    tableContainer.classList.remove('d-none');
+    noPhishingMessage.classList.add('d-none');
+    
+    // Add rows for each phishing email
+    phishingEmails.forEach(email => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${email.sender.split('@')[0]}</td>
+            <td class="text-truncate" style="max-width: 150px;">${email.subject || '(No subject)'}</td>
+            <td>
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-danger" role="progressbar" style="width: ${email.phishing_score}%;" 
+                         aria-valuenow="${email.phishing_score}" aria-valuemin="0" aria-valuemax="100">
+                        ${email.phishing_score}%
+                    </div>
+                </div>
+            </td>
+            <td>
+                <a href="{{ url_for('email_processor_bp.email_detail', email_id=0) }}#phishing".replace('0', ${email.id}) class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-eye"></i> View
+                </a>
+            </td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
 </script>
 {% endblock %}
