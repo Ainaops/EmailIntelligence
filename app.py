@@ -47,6 +47,11 @@ def index():
         return redirect(url_for("email_processor_bp.dashboard"))
     return render_template("index.html")
 
+# Health check endpoint for cloud monitoring (Render/AWS/K8s)
+@app.route("/healthz")
+def health():
+    return "OK", 200
+
 # Error handlers
 @app.errorhandler(404)
 def page_not_found(e):
