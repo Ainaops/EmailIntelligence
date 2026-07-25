@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func, desc, and_
-from app import db
+from db_init import db
 from models import User, Email, UserProgress, PhishingClassification
 
 user_progress_bp = Blueprint('user_progress_bp', __name__)

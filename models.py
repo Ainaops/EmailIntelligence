@@ -1,5 +1,6 @@
+# models.py
 from datetime import datetime
-from app import db
+from db_init import db  # Changed from 'from db_init import db'
 from flask_login import UserMixin
 
 # Define machine learning model type enum

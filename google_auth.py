@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 
 import requests
-from app import db
+from db_init import db
 from flask import Blueprint, redirect, request, url_for, flash, session
 from flask_login import login_required, login_user, logout_user, current_user
 from models import User, UserProgress
@@ -26,17 +26,7 @@ else:
     logger.info("Google OAuth credentials are configured")
 
 # Make sure to use this redirect URL. It has to match the one in the whitelist
-DEV_REDIRECT_URL = f'https://{os.environ.get("REPLIT_DEV_DOMAIN", "localhost")}/google_login/callback'
-
-# Display setup instructions
-print(f"""To make Google authentication work:
-1. Go to https://console.cloud.google.com/apis/credentials
-2. Create a new OAuth 2.0 Client ID
-3. Add {DEV_REDIRECT_URL} to Authorized redirect URIs
-
-For detailed instructions, see:
-https://docs.replit.com/additional-resources/google-auth-in-flask#set-up-your-oauth-app--client
-""")
+DEV_REDIRECT_URL = 'https://abfb-105-113-91-56.ngrok-free.app/google_login/callback'
 
 client = WebApplicationClient(GOOGLE_CLIENT_ID)
 

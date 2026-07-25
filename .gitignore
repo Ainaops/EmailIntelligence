@@ -1,0 +1,46 @@
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite Databases & Instance directory
+instance/
+*.db
+*.sqlite3
+
+# Environment & Secret Files
+.env
+.env.*
+client_secret*.json
+secrets.json
+
+# Exclude Data Folders & Raw Datasets
+data/
+Data/
+*.csv
+
+# Exclude Large Model Folders & Model Artifacts (>100MB GitHub limit)
+models/
+Models/
+phishing_classifier.pkl
+*.npy
+*.pkl
+!scaler.pkl
+notebooks/deberta_model/
+notebooks/deberta_tokenizer/
+*.log
+
+# IDE & OS Specific Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
