@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET") or os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.secret_key = os.environ.get("SESSION_SECRET") or secrets.token_hex(32)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Initialize database
