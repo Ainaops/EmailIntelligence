@@ -346,6 +346,9 @@ def callback():
         login_user(user)
         session[SESSION_ACCESS_TOKEN_KEY] = token_data.get("access_token")
 
+        # Flush stale redirect warnings queued prior to login
+        session.pop('_flashes', None)
+
         if is_new:
             flash(f"Welcome, {user.username}! Account created successfully.", "success")
         else:

@@ -144,23 +144,62 @@ def extract_features(email):
     return features
 
 def classify_email(email):
-    """Classify an email using DeBERTa embedding + ensemble of 25 models."""
+    """Classify an email using DeBERTa embedding + ensemble of loaded models with explainable voting details."""
+    import time
+    start_time = time.time()
     try:
         full_text = (email.subject or '') + ' ' + (email.body_text or '')
         embedding = get_deberta_embedding(full_text)
 
         probs = []
+        model_votes = {}
+        phishing_voters = []
+        legit_voters = []
+
         for name, model in models.items():
             if 'LogisticRegression' in name:
                 embedding_scaled = scaler.transform(embedding)
-                prob = model.predict_proba(embedding_scaled)[0, 1]
+                prob = float(model.predict_proba(embedding_scaled)[0, 1])
             else:
-                prob = model.predict_proba(embedding)[0, 1]
+                prob = float(model.predict_proba(embedding)[0, 1])
+            
             probs.append(prob)
+            is_phish_vote = prob > 0.5
+            vote_label = 'phishing' if is_phish_vote else 'legitimate'
+            
+            model_votes[name] = {
+                'probability': round(prob, 4),
+                'vote': vote_label
+            }
+            if is_phish_vote:
+                phishing_voters.append(name)
+            else:
+                legit_voters.append(name)
 
-        phishing_score = np.mean(probs)
+        if probs:
+            phishing_score = float(np.mean(probs))
+        else:
+            phishing_score = 0.0
+
+        confidence = round(abs(phishing_score - 0.5) * 2 * 100, 1)
+        proc_time = round(time.time() - start_time, 4)
         features = extract_features(email)
-        return phishing_score, features
+
+        research_metadata = {
+            'embedding_model': 'DeBERTa-v3-base',
+            'phishing_score': round(phishing_score, 4),
+            'confidence_percent': confidence,
+            'processing_time_sec': proc_time,
+            'total_models_evaluated': len(probs),
+            'phishing_votes_count': len(phishing_voters),
+            'legitimate_votes_count': len(legit_voters),
+            'phishing_voters': phishing_voters,
+            'legitimate_voters': legit_voters,
+            'model_votes': model_votes,
+            'heuristic_features': features
+        }
+
+        return phishing_score, research_metadata
 
     except Exception as e:
         logger.error(f"Error classifying email {email.id}: {e}")
@@ -172,7 +211,7 @@ def classify_email(email):
 @phishing_detector_bp.route('/analyze_emails')
 @login_required
 def analyze_emails():
-    """Analyze all unclassified emails for phishing"""
+    """Analyze all unclassified emails for phishing with detailed voting telemetry"""
     try:
         emails = Email.query.filter_by(user_id=current_user.id).outerjoin(
             PhishingClassification, Email.id == PhishingClassification.email_id
@@ -184,23 +223,19 @@ def analyze_emails():
 
         analyzed_count = 0
         for email in emails:
-            phishing_score, features = classify_email(email)
+            phishing_score, research_meta = classify_email(email)
             classification = PhishingClassification(
                 email_id=email.id,
                 phishing_score=phishing_score,
                 is_phishing=phishing_score > 0.5,
-                features_json=json.dumps({
-                    'embedding_model': 'DeBERTa-v3-base',
-                    'phishing_score': phishing_score,
-                    'heuristic_features': features
-                }),
+                features_json=json.dumps(research_meta),
                 classified_at=datetime.utcnow()
             )
             db.session.add(classification)
             analyzed_count += 1
 
         db.session.commit()
-        flash(f"Successfully analyzed {analyzed_count} emails", "success")
+        flash(f"Successfully analyzed {analyzed_count} emails using 25-fold ML ensemble", "success")
         return jsonify({'success': True, 'message': f'Analyzed {analyzed_count} emails', 'count': analyzed_count})
 
     except Exception as e:

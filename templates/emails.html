@@ -16,26 +16,30 @@
 
 <div class="card bg-dark">
     <div class="card-body">
-        <!-- Email Filters -->
-        <div class="mb-4">
-            <div class="row">
-                <div class="col-md-8">
+        <!-- Email Search & Filters -->
+        <form method="GET" action="{{ url_for('email_processor_bp.emails_list') }}" class="mb-4">
+            <div class="row g-2">
+                <div class="col-md-5">
                     <div class="input-group">
-                        <input type="text" id="emailSearch" class="form-control" placeholder="Search emails...">
-                        <button class="btn btn-outline-secondary" type="button" id="searchButton">
-                            <i class="fas fa-search"></i>
-                        </button>
+                        <span class="input-group-text bg-secondary text-white"><i class="fas fa-search"></i></span>
+                        <input type="text" name="q" class="form-control" placeholder="Search subject, body, or sender..." value="{{ q or '' }}">
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <select class="form-select" id="emailFilter">
-                        <option value="all">All Emails</option>
-                        <option value="read">Read Only</option>
-                        <option value="unread">Unread Only</option>
+                <div class="col-md-3">
+                    <select name="status" class="form-select" onchange="this.form.submit()">
+                        <option value="all" {% if status == 'all' or not status %}selected{% endif %}>All Classifications</option>
+                        <option value="phishing" {% if status == 'phishing' %}selected{% endif %}>🚨 Phishing Only</option>
+                        <option value="legitimate" {% if status == 'legitimate' %}selected{% endif %}>✅ Legitimate Only</option>
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <input type="text" name="sender" class="form-control" placeholder="Filter by sender email..." value="{{ sender or '' }}">
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter"></i> Filter</button>
+                </div>
             </div>
-        </div>
+        </form>
 
         <!-- Email List -->
         <div class="table-responsive">

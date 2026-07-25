@@ -72,11 +72,14 @@ def clean_html(html_content):
         logger.error(f"Error cleaning HTML: {str(e)}")
         return "Error cleaning HTML content"
 
-def fetch_emails(limit=10, offset=0):
-    """Fetch emails from Gmail using IMAP"""
+def fetch_emails(limit=100, offset=0):
+    """Fetch emails from Gmail using IMAP with deduplication and metrics tracking"""
     if not current_user.gmail_access_token:
         flash("Gmail access token not available. Please re-authenticate.", "warning")
-        return []
+        return {"new": 0, "skipped": 0, "total_time": 0, "emails": []}
+
+    import time
+    start_time = time.time()
 
     try:
         # Connect to Gmail's IMAP server
@@ -93,7 +96,7 @@ def fetch_emails(limit=10, offset=0):
         status, data = mail.search(None, 'ALL')
         if status != 'OK':
             logger.error(f"Error searching for emails: {status}")
-            return []
+            return {"new": 0, "skipped": 0, "total_time": 0, "emails": []}
         
         # Get email IDs
         email_ids = data[0].split()
@@ -107,7 +110,8 @@ def fetch_emails(limit=10, offset=0):
         email_ids.reverse()  # Newest first
         
         emails = []
-        processed_count = 0
+        new_count = 0
+        skipped_count = 0
         
         for e_id in email_ids:
             status, data = mail.fetch(e_id, '(RFC822)')
@@ -121,15 +125,15 @@ def fetch_emails(limit=10, offset=0):
             # Extract email fields
             message_id = email_message.get('Message-ID', '')
             
-            # Check if email already exists in database
+            # Check if email already exists in database (Deduplication)
             existing_email = Email.query.filter_by(
                 user_id=current_user.id,
                 message_id=message_id
             ).first()
             
             if existing_email:
-                # Add to the list if it exists in DB
                 emails.append(existing_email)
+                skipped_count += 1
                 continue
             
             # Parse email details
@@ -219,13 +223,13 @@ def fetch_emails(limit=10, offset=0):
             # Add to database
             db.session.add(new_email)
             emails.append(new_email)
-            processed_count += 1
+            new_count += 1
         
         # Update user progress
-        if processed_count > 0:
+        if new_count > 0:
             progress = UserProgress.query.filter_by(user_id=current_user.id).first()
             if progress:
-                progress.total_emails_processed += processed_count
+                progress.total_emails_processed += new_count
                 progress.last_email_processed = datetime.utcnow()
                 progress.last_sync_date = datetime.utcnow()
                 
@@ -244,17 +248,17 @@ def fetch_emails(limit=10, offset=0):
         
         # Logout from IMAP
         mail.logout()
-        
-        return emails
+        total_time = round(time.time() - start_time, 2)
+        return {"new": new_count, "skipped": skipped_count, "total_time": total_time, "emails": emails}
     
     except imaplib.IMAP4.error as e:
         logger.exception("IMAP protocol error while fetching emails")
         flash("Failed to fetch emails. Your Gmail access may have expired.", "danger")
-        return []
+        return {"new": 0, "skipped": 0, "total_time": 0, "emails": []}
     except Exception as e:
         logger.exception("An unexpected error occurred while fetching emails")
         flash("An error occurred while fetching emails. Please try again.", "danger")
-        return []
+        return {"new": 0, "skipped": 0, "total_time": 0, "emails": []}
 
 
 @email_processor_bp.route("/dashboard")
@@ -289,32 +293,59 @@ def dashboard():
 @email_processor_bp.route("/fetch-emails")
 @login_required
 def fetch_emails_route():
-    """Route to fetch emails"""
-    limit = int(request.args.get('limit', 10))
+    """Route to fetch emails with deduplication and processing metrics"""
+    limit = int(request.args.get('limit', 100))
     offset = int(request.args.get('offset', 0))
     
     # Fetch emails
-    fetch_emails(limit, offset)
-    
-    # Commit changes
+    stats = fetch_emails(limit, offset)
     db.session.commit()
     
-    flash(f"Emails fetched successfully", "success")
+    if isinstance(stats, dict) and 'total_time' in stats:
+        flash(f"Sync complete ({stats['total_time']}s): {stats['new']} new emails processed, {stats['skipped']} existing emails skipped.", "success")
+    else:
+        flash("Emails fetched successfully", "success")
+        
     return redirect(url_for('email_processor_bp.emails_list'))
 
 @email_processor_bp.route("/emails")
 @login_required
 def emails_list():
-    """Display the list of emails"""
+    """Display and filter the list of emails"""
+    from models import PhishingClassification
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
-    # Get emails with pagination
-    emails_pagination = Email.query.filter_by(user_id=current_user.id)\
-        .order_by(Email.date_received.desc())\
-        .paginate(page=page, per_page=per_page, error_out=False)
+    query_text = request.args.get('q', '').strip()
+    status_filter = request.args.get('status', 'all').strip()
+    sender_filter = request.args.get('sender', '').strip()
     
-    return render_template('emails.html', emails=emails_pagination)
+    query = Email.query.filter_by(user_id=current_user.id)
+    
+    if query_text:
+        search_pattern = f"%{query_text}%"
+        query = query.filter(
+            (Email.subject.ilike(search_pattern)) |
+            (Email.body_cleaned.ilike(search_pattern)) |
+            (Email.sender.ilike(search_pattern))
+        )
+        
+    if sender_filter:
+        query = query.filter(Email.sender.ilike(f"%{sender_filter}%"))
+        
+    if status_filter in ['phishing', 'legitimate']:
+        is_phish = (status_filter == 'phishing')
+        query = query.join(PhishingClassification, Email.id == PhishingClassification.email_id).filter(
+            PhishingClassification.is_phishing == is_phish
+        )
+    
+    emails_pagination = query.order_by(Email.date_received.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    return render_template('emails.html', 
+                           emails=emails_pagination, 
+                           q=query_text, 
+                           status=status_filter, 
+                           sender=sender_filter)
 
 @email_processor_bp.route("/email/<int:email_id>")
 @login_required
