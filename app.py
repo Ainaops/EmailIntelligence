@@ -1,5 +1,6 @@
 # app.py
 import os
+import secrets
 import logging
 from flask import Flask, render_template, redirect, url_for, flash, request
 from flask_login import LoginManager, current_user, login_required
@@ -10,7 +11,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev_secret_key_123")
+app.secret_key = os.environ.get("SESSION_SECRET") or os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Initialize database

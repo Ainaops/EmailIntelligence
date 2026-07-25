@@ -248,12 +248,12 @@ def fetch_emails(limit=10, offset=0):
         return emails
     
     except imaplib.IMAP4.error as e:
-        logger.error(f"IMAP error: {str(e)}")
+        logger.exception("IMAP protocol error while fetching emails")
         flash("Failed to fetch emails. Your Gmail access may have expired.", "danger")
         return []
     except Exception as e:
-        logger.error(f"Error fetching emails: {str(e)}")
-        flash(f"An error occurred while fetching emails: {str(e)}", "danger")
+        logger.exception("An unexpected error occurred while fetching emails")
+        flash("An error occurred while fetching emails. Please try again.", "danger")
         return []
 
 

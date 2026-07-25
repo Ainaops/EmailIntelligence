@@ -289,6 +289,7 @@ def reset_progress():
         flash("Your progress and emails have been reset", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Error resetting progress: {str(e)}", "danger")
+        logger.exception("Error resetting user progress and emails")
+        flash("An error occurred while resetting progress. Please try again.", "danger")
     
     return redirect(url_for('user_progress_bp.profile'))
