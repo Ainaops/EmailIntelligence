@@ -1,6 +1,6 @@
 """
 Google OAuth 2.0 Authentication & Session Management Module
-Refactored for enterprise code quality, separation of concerns, and security.
+Environment-driven configuration for portable local and production deployment.
 """
 
 import json
@@ -24,36 +24,62 @@ from models import User, UserProgress
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 🛠️ Configuration & Constants
+# 🛠️ Configuration & Environment Validation
 # ==============================================================================
 
 class OAuthConfig:
-    """Centralized configuration and credential validator for Google OAuth."""
+    """
+    Centralized configuration and credential validator for Google OAuth.
+    
+    Environment variables are used instead of hardcoded URLs to ensure seamless
+    portability across local development (e.g. ngrok / localhost), staging, and
+    cloud production deployments (e.g. Render) without making code changes or
+    leaking hardcoded URLs into version control.
+    """
     CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
     CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
-    REDIRECT_URI = os.environ.get(
-        "GOOGLE_REDIRECT_URI",
-        "https://abfb-105-113-91-56.ngrok-free.app/google_login/callback"
-    )
+    
+    # Read the OAuth redirect URI strictly from the environment variable.
+    # No hardcoded DEV_REDIRECT_URL fallback is used to guarantee environment isolation.
+    REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI")
+    
     DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
     SCOPES = ["openid", "email", "profile", "https://mail.google.com/"]
     HTTP_TIMEOUT = 10  # Seconds
 
     @classmethod
-    def validate(cls):
-        """Validate that essential OAuth environment variables are present."""
+    def validate_credentials(cls):
+        """Validate essential OAuth client credentials."""
         if not cls.CLIENT_ID or not cls.CLIENT_SECRET:
-            logger.warning("Google OAuth credentials (CLIENT_ID / CLIENT_SECRET) are missing.")
+            logger.warning("GOOGLE_OAUTH_CLIENT_ID or GOOGLE_OAUTH_CLIENT_SECRET is not set in environment.")
             return False
         return True
 
+    @classmethod
+    def validate_redirect_uri(cls):
+        """
+        Validate that GOOGLE_REDIRECT_URI environment variable is configured and non-empty.
+        Log a warning if missing to allow graceful handling.
+        """
+        if not cls.REDIRECT_URI or not cls.REDIRECT_URI.strip():
+            logger.warning("GOOGLE_REDIRECT_URI environment variable is missing or empty.")
+            return False
+        return True
+
+    @classmethod
+    def get_redirect_uri(cls):
+        """Return the environment-configured GOOGLE_REDIRECT_URI or None."""
+        if cls.validate_redirect_uri():
+            return cls.REDIRECT_URI.strip()
+        return None
+
 SESSION_ACCESS_TOKEN_KEY = "access_token"
 
-# Log credential status on module load
-if not OAuthConfig.validate():
-    logger.warning("Google OAuth credentials are not fully configured.")
-else:
-    logger.info("Google OAuth credentials initialized successfully.")
+# Log status on module load
+if not OAuthConfig.validate_credentials():
+    logger.warning("Google OAuth credentials (CLIENT_ID / CLIENT_SECRET) are missing or incomplete.")
+if not OAuthConfig.validate_redirect_uri():
+    logger.warning("GOOGLE_REDIRECT_URI environment variable is not configured.")
 
 google_auth = Blueprint("google_auth", __name__)
 
@@ -96,9 +122,11 @@ class GoogleOAuthService:
         self.client = WebApplicationClient(OAuthConfig.CLIENT_ID) if OAuthConfig.CLIENT_ID else None
 
     def get_authorization_url(self, redirect_uri):
-        """Construct the Google OAuth authorization URL."""
-        if not OAuthConfig.validate() or not self.client:
+        """Construct the Google OAuth authorization URL using GOOGLE_REDIRECT_URI."""
+        if not OAuthConfig.validate_credentials() or not self.client:
             raise ValueError("Google OAuth credentials not configured.")
+        if not redirect_uri:
+            raise ValueError("GOOGLE_REDIRECT_URI environment variable is missing or empty.")
         
         cfg = get_google_provider_cfg()
         auth_endpoint = cfg["authorization_endpoint"]
@@ -111,8 +139,10 @@ class GoogleOAuthService:
 
     def exchange_code_for_tokens(self, code, authorization_response, redirect_uri):
         """Exchange authorization code for OAuth access and refresh tokens."""
-        if not OAuthConfig.validate() or not self.client:
+        if not OAuthConfig.validate_credentials() or not self.client:
             raise ValueError("Google OAuth credentials missing or invalid.")
+        if not redirect_uri:
+            raise ValueError("GOOGLE_REDIRECT_URI environment variable is missing or empty.")
 
         cfg = get_google_provider_cfg()
         token_endpoint = cfg["token_endpoint"]
@@ -166,7 +196,7 @@ class GoogleOAuthService:
 
     def refresh_access_token(self, refresh_token):
         """Refresh an expired OAuth access token using a refresh token."""
-        if not OAuthConfig.validate():
+        if not OAuthConfig.validate_credentials():
             raise ValueError("Google OAuth credentials not configured.")
 
         cfg = get_google_provider_cfg()
@@ -246,14 +276,6 @@ class UserService:
         db.session.commit()
 
 
-# Helper to get active redirect URI dynamically
-def get_redirect_uri():
-    """Return configured redirect URI or dynamically generate fallback."""
-    if OAuthConfig.REDIRECT_URI:
-        return OAuthConfig.REDIRECT_URI
-    return url_for("google_auth.callback", _external=True, _scheme="https")
-
-
 # ==============================================================================
 # 🔀 Flask Routes (Controllers)
 # ==============================================================================
@@ -261,13 +283,20 @@ def get_redirect_uri():
 @google_auth.route("/google_login")
 def login():
     """Initiate Google OAuth authentication flow."""
-    if not OAuthConfig.validate():
-        flash("Google OAuth credentials not configured.", "danger")
+    # Validate OAuth client credentials
+    if not OAuthConfig.validate_credentials():
+        flash("Google OAuth credentials not configured. Please check environment variables.", "danger")
+        return redirect(url_for("index"))
+
+    # Validate that GOOGLE_REDIRECT_URI environment variable is configured and non-empty
+    redirect_uri = OAuthConfig.get_redirect_uri()
+    if not redirect_uri:
+        logger.warning("OAuth login failed: GOOGLE_REDIRECT_URI environment variable is not configured.")
+        flash("Authentication error: GOOGLE_REDIRECT_URI environment variable is not configured. Please check server environment settings.", "danger")
         return redirect(url_for("index"))
 
     try:
         oauth_service = GoogleOAuthService()
-        redirect_uri = get_redirect_uri()
         request_uri = oauth_service.get_authorization_url(redirect_uri)
         return redirect(request_uri)
 
@@ -289,11 +318,17 @@ def callback():
         flash("Authentication failed: Missing authorization code.", "danger")
         return redirect(url_for("index"))
 
+    # Validate that GOOGLE_REDIRECT_URI environment variable is configured and non-empty
+    redirect_uri = OAuthConfig.get_redirect_uri()
+    if not redirect_uri:
+        logger.warning("OAuth callback failed: GOOGLE_REDIRECT_URI environment variable is not configured.")
+        flash("Authentication error: GOOGLE_REDIRECT_URI environment variable is not configured. Please check server environment settings.", "danger")
+        return redirect(url_for("index"))
+
     try:
         oauth_service = GoogleOAuthService()
-        redirect_uri = get_redirect_uri()
 
-        # 1. Exchange code for tokens
+        # 1. Exchange code for tokens using environment GOOGLE_REDIRECT_URI
         auth_response_url = request.url.replace("http://", "https://")
         token_data = oauth_service.exchange_code_for_tokens(
             code=code,
