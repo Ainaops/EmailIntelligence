@@ -28,7 +28,7 @@ data/
 Data/
 *.csv
 
-# Exclude Large Model Folders & Model Artifacts (>100MB GitHub limit)
+# Exclude Model Folders & Large Model Weight Artifacts (>100MB GitHub limit)
 models/
 Models/
 phishing_classifier.pkl
