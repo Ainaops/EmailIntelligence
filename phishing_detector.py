@@ -65,7 +65,7 @@ except Exception as e:
     scaler = None
 
 # ===============================
-# 📦 Auto-Download Models from Hugging Face Hub (if missing)
+# 📦 Verify Model Presence (Built during Render Build Step)
 # ===============================
 model_names = ['RandomForest', 'XGBoost', 'LogisticRegression', 'GradientBoosting', 'ExtraTrees']
 expected_model_files = [
@@ -74,33 +74,9 @@ expected_model_files = [
     for fold in range(1, 6)
 ]
 
-# Check if any expected model file is missing locally
 missing_models = [path for path in expected_model_files if not os.path.exists(path)]
-
 if missing_models:
-    logger.info(f"Detected {len(missing_models)} missing model files. Syncing from Hugging Face (Ainaops/email-intelligence-models)...")
-    try:
-        from huggingface_hub import snapshot_download
-        hf_token = os.environ.get("HF_TOKEN")
-        
-        # Download repository into BASE_DIR preserving models/ folder structure
-        snapshot_download(
-            repo_id="Ainaops/email-intelligence-models",
-            local_dir=BASE_DIR,
-            local_dir_use_symlinks=False,
-            token=hf_token
-        )
-        logger.info("✅ Hugging Face model repository sync complete.")
-    except Exception as e:
-        logger.error(f"❌ Failed to download model artifacts from Hugging Face Hub: {e}")
-        raise RuntimeError(f"Critical initialization failure: ML model download from Hugging Face failed: {e}")
-
-# Re-verify model presence after download attempt
-still_missing = [path for path in expected_model_files if not os.path.exists(path)]
-if still_missing:
-    error_msg = f"Critical initialization failure: {len(still_missing)} model files are missing from {MODEL_DIR} even after Hugging Face sync."
-    logger.critical(error_msg)
-    raise RuntimeError(error_msg)
+    logger.warning(f"⚠️ {len(missing_models)} model fold files are missing from {MODEL_DIR}. Ensure the Render Build Command downloaded HF weights.")
 
 # ===============================
 # ✅ Load all 25 trained models
