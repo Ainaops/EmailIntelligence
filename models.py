@@ -13,9 +13,9 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
-    gmail_access_token = db.Column(db.String(256))
-    gmail_refresh_token = db.Column(db.String(256))
+    password_hash = db.Column(db.Text)
+    gmail_access_token = db.Column(db.Text)
+    gmail_refresh_token = db.Column(db.Text)
     gmail_token_expiry = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
@@ -23,6 +23,60 @@ class User(UserMixin, db.Model):
     # Relationships
     emails = db.relationship('Email', backref='user', lazy=True)
     progress = db.relationship('UserProgress', backref='user', lazy=True, uselist=False)
+
+    @staticmethod
+    def _get_cipher():
+        import os
+        import base64
+        from cryptography.fernet import Fernet
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        
+        secret = (os.environ.get("SESSION_SECRET") or os.environ.get("SECRET_KEY") or "default_dev_secret_key").encode()
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=b"email_intelligence_salt",
+            iterations=100000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(secret))
+        return Fernet(key)
+
+    def set_access_token(self, token):
+        """Encrypt and store access token."""
+        if not token:
+            self.gmail_access_token = None
+            return
+        cipher = self._get_cipher()
+        self.gmail_access_token = cipher.encrypt(token.encode()).decode()
+
+    def get_access_token(self):
+        """Decrypt and return access token."""
+        if not self.gmail_access_token:
+            return None
+        try:
+            cipher = self._get_cipher()
+            return cipher.decrypt(self.gmail_access_token.encode()).decode()
+        except Exception:
+            return self.gmail_access_token  # Fallback for plain tokens
+
+    def set_refresh_token(self, token):
+        """Encrypt and store refresh token."""
+        if not token:
+            self.gmail_refresh_token = None
+            return
+        cipher = self._get_cipher()
+        self.gmail_refresh_token = cipher.encrypt(token.encode()).decode()
+
+    def get_refresh_token(self):
+        """Decrypt and return refresh token."""
+        if not self.gmail_refresh_token:
+            return None
+        try:
+            cipher = self._get_cipher()
+            return cipher.decrypt(self.gmail_refresh_token.encode()).decode()
+        except Exception:
+            return self.gmail_refresh_token  # Fallback for plain tokens
 
     def __repr__(self):
         return f'<User {self.username}>'
