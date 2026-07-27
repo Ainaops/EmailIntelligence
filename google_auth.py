@@ -376,10 +376,10 @@ def callback():
         flash("Authentication failed due to invalid response.", "danger")
     except SQLAlchemyError as e:
         db.session.rollback()
-        logger.error(f"Database error saving user session: {e}")
+        logger.exception("Database error saving user session")
         flash("Account creation failed due to database error.", "danger")
     except Exception as e:
-        logger.error(f"Unexpected error during Google callback: {e}")
+        logger.exception("Unexpected error during Google callback")
         flash("An unexpected authentication error occurred.", "danger")
 
     return redirect(url_for("index"))
