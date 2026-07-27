@@ -90,22 +90,22 @@ if missing_models:
     logger.warning(f"⚠️ {len(missing_models)} model fold files are missing from {MODEL_DIR}. Ensure the Render Build Command downloaded HF weights.")
 
 # ===============================
-# ✅ Load all 25 trained models
+# 📦 Lazy Model Storage & Helper
 # ===============================
 models = {}
 
-logger.info("Loading 25 trained models...")
-
-for name in model_names:
-    for fold in range(1, 6):
-        model_path = os.path.join(MODEL_DIR, f"{name}_fold_{fold}.pkl")
-        try:
-            models[f"{name}_fold_{fold}"] = joblib.load(model_path)
-            logger.info(f"✅ Loaded {name}_fold_{fold}")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not load {name}_fold_{fold}: {e}")
-
-logger.info(f"✅ Total models loaded: {len(models)}")
+def get_model(name, fold):
+    """Lazily load a model fold into memory on demand."""
+    model_key = f"{name}_fold_{fold}"
+    if model_key not in models:
+        model_path = os.path.join(MODEL_DIR, f"{model_key}.pkl")
+        if os.path.exists(model_path):
+            try:
+                models[model_key] = joblib.load(model_path)
+                logger.info(f"✅ Lazily loaded {model_key}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not load {model_key}: {e}")
+    return models.get(model_key)
 
 # ===============================
 # 🔍 Helper functions
@@ -180,25 +180,31 @@ def classify_email(email):
         phishing_voters = []
         legit_voters = []
 
-        for name, model in models.items():
-            if 'LogisticRegression' in name:
-                embedding_scaled = scaler.transform(embedding)
-                prob = float(model.predict_proba(embedding_scaled)[0, 1])
-            else:
-                prob = float(model.predict_proba(embedding)[0, 1])
-            
-            probs.append(prob)
-            is_phish_vote = prob > 0.5
-            vote_label = 'phishing' if is_phish_vote else 'legitimate'
-            
-            model_votes[name] = {
-                'probability': round(prob, 4),
-                'vote': vote_label
-            }
-            if is_phish_vote:
-                phishing_voters.append(name)
-            else:
-                legit_voters.append(name)
+        for name in model_names:
+            for fold in range(1, 6):
+                model_key = f"{name}_fold_{fold}"
+                model = get_model(name, fold)
+                if not model:
+                    continue
+                
+                if 'LogisticRegression' in name:
+                    embedding_scaled = scaler.transform(embedding)
+                    prob = float(model.predict_proba(embedding_scaled)[0, 1])
+                else:
+                    prob = float(model.predict_proba(embedding)[0, 1])
+                
+                probs.append(prob)
+                is_phish_vote = prob > 0.5
+                vote_label = 'phishing' if is_phish_vote else 'legitimate'
+                
+                model_votes[model_key] = {
+                    'probability': round(prob, 4),
+                    'vote': vote_label
+                }
+                if is_phish_vote:
+                    phishing_voters.append(model_key)
+                else:
+                    legit_voters.append(model_key)
 
         if probs:
             phishing_score = float(np.mean(probs))
