@@ -11,6 +11,7 @@ flask-login==0.6.3
 flask-sqlalchemy==3.1.1
 greenlet==3.2.4
 gunicorn==23.0.0
+huggingface-hub>=0.28.0
 idna==3.10
 itsdangerous==2.2.0
 jinja2==3.1.6
