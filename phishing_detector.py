@@ -74,6 +74,17 @@ expected_model_files = [
     for fold in range(1, 6)
 ]
 
+# Diagnostic Logging: Inspect filesystem structure at boot
+logger.info("=" * 60)
+logger.info(f"BASE_DIR: {BASE_DIR}")
+logger.info(f"MODEL_DIR EXISTS: {os.path.exists(MODEL_DIR)}")
+if os.path.exists(MODEL_DIR):
+    for root, dirs, files in os.walk(MODEL_DIR):
+        logger.info(f"Directory: {root}")
+        for f in files:
+            logger.info(f"    File: {f}")
+logger.info("=" * 60)
+
 missing_models = [path for path in expected_model_files if not os.path.exists(path)]
 if missing_models:
     logger.warning(f"⚠️ {len(missing_models)} model fold files are missing from {MODEL_DIR}. Ensure the Render Build Command downloaded HF weights.")
